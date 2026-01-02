@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 text-center mb-5">
+        <h1 class="text-info fw-bold">📚 Albümlerimiz</h1>
+        <p class="lead">Özel anıları burada gruplayabilirsin.</p>
+        
+        <button class="btn btn-info text-white rounded-pill px-4 mt-2 shadow" data-bs-toggle="modal" data-bs-target="#createAlbumModal">
+            + Yeni Albüm Oluştur
+        </button>
+    </div>
+</div>
+
+<div class="row g-4">
+    {% for album in albums %}
+    <div class="col-6 col-md-4">
+        <a href="/album/{{ album.id }}" class="text-decoration-none">
+            <div class="card shadow border-0 h-100 album-card">
+                <div style="height: 200px; overflow: hidden; border-radius: 12px 12px 0 0;">
+                    {% if album.cover_image %}
+                        <img src="{{ url_for('static', filename='uploads/' + album.cover_image) }}" class="w-100 h-100" style="object-fit: cover;">
+                    {% else %}
+                        <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-muted">Kapak Yok</div>
+                    {% endif %}
+                </div>
+                <div class="card-body text-center">
+                    <h5 class="card-title text-dark fw-bold">{{ album.name }}</h5>
+                    <p class="card-text text-muted small">{{ album.memories|length }} Anı</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    {% else %}
+    <div class="col-12 text-center text-muted">Henüz albüm yok.</div>
+    {% endfor %}
+</div>
+
+<div class="modal fade" id="createAlbumModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/create_album" method="post" enctype="multipart/form-data">
+                <div class="modal-header"><h5 class="modal-title">Yeni Albüm</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3"><label>Albüm Adı</label><input type="text" name="name" class="form-control" required></div>
+                    <div class="mb-3"><label>Kapak Fotoğrafı</label><input type="file" name="cover_image" class="form-control"></div>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-info text-white">Oluştur</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

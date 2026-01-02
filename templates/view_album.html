@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    #lightbox { display: none; position: fixed; z-index: 9999; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.95); align-items: center; justify-content: center; }
+    #lightbox img { max-width: 90%; max-height: 90vh; border-radius: 5px; object-fit: contain; }
+    .lightbox-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; cursor: pointer; }
+    .lightbox-prev, .lightbox-next { position: absolute; top: 50%; transform: translateY(-50%); color: white; font-size: 50px; cursor: pointer; padding: 20px; }
+    .lightbox-prev { left: 10px; } .lightbox-next { right: 10px; }
+</style>
+
+<div class="text-center mb-5">
+    <h1 class="fw-bold">{{ album.name }}</h1>
+    <a href="/albums" class="btn btn-outline-secondary btn-sm rounded-pill mt-2">← Albümlere Dön</a>
+</div>
+
+<div class="row g-3">
+    {% set ns = namespace(img_index=0) %}
+    {% for memory in album.memories %}
+    <div class="col-6 col-md-4 col-lg-3">
+        <div class="memory-card h-100">
+            {% if memory.media_type == 'image' %}
+                <a href="javascript:void(0)" onclick="openLightbox('{{ ns.img_index }}')">
+                    <img src="{{ url_for('static', filename='uploads/' + memory.filename) }}" alt="Anı" class="gallery-img" data-src="{{ url_for('static', filename='uploads/' + memory.filename) }}">
+                </a>
+                {% set ns.img_index = ns.img_index + 1 %}
+            {% else %}
+                <video controls style="width:100%; height:250px; object-fit:cover;"><source src="{{ url_for('static', filename='uploads/' + memory.filename) }}" type="video/mp4"></video>
+            {% endif %}
+            <div class="text-center mt-1"><small class="text-muted">{{ memory.date_str }}</small></div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5"><p class="text-muted">Bu albüm boş.</p></div>
+    {% endfor %}
+</div>
+
+<div id="lightbox">
+    <span class="lightbox-close" onclick="closeLightbox()">&times;</span>
+    <span class="lightbox-prev" onclick="changeImage(-1)">&#10094;</span>
+    <span class="lightbox-next" onclick="changeImage(1)">&#10095;</span>
+    <img id="lightbox-img" src="" alt="Büyük Resim">
+</div>
+
+<script>
+    let allImages = []; let currentImgIndex = 0; const lightbox = document.getElementById('lightbox'); const lightboxImg = document.getElementById('lightbox-img');
+    document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.gallery-img').forEach(img => allImages.push(img.getAttribute('data-src'))); });
+    function openLightbox(index) { currentImgIndex = parseInt(index); lightboxImg.src = allImages[currentImgIndex]; lightbox.style.display = 'flex'; }
+    function closeLightbox() { lightbox.style.display = 'none'; lightboxImg.src = ''; }
+    function changeImage(step) { currentImgIndex += step; if (currentImgIndex >= allImages.length) currentImgIndex = 0; if (currentImgIndex < 0) currentImgIndex = allImages.length - 1; lightboxImg.src = allImages[currentImgIndex]; }
+    document.addEventListener('keydown', function(event) { if (lightbox.style.display === 'flex') { if (event.key === "ArrowLeft") changeImage(-1); if (event.key === "ArrowRight") changeImage(1); if (event.key === "Escape") closeLightbox(); } });
+</script>
+{% endblock %}

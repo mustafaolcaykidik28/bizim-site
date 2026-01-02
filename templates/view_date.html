@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<style>
+    /* Stil Kodları (Aynı) */
+    #context-menu { display: none; position: absolute; z-index: 1000; background: white; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); border: 1px solid #eee; min-width: 200px; }
+    #context-menu ul { list-style: none; margin: 0; padding: 0; }
+    #context-menu li { padding: 12px 20px; cursor: pointer; color: #333; display: flex; align-items: center; border-bottom: 1px solid #f8f9fa;}
+    #context-menu li:last-child { border-bottom: none; }
+    #context-menu li:hover { background-color: #fff0f3; color: #dc3545; }
+    #context-menu li span { margin-right: 10px; font-size: 1.2rem; }
+    .memory-card { cursor: context-menu; display: flex; flex-direction: column; }
+    .note-card { background-color: #fff3cd; border-left: 5px solid #ffecb5; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; cursor: context-menu; }
+    .note-content { font-family: 'Segoe UI', sans-serif; font-size: 1.1rem; color: #555; white-space: pre-wrap; }
+    .note-star { position: absolute; top: 5px; right: 5px; font-size: 1.2rem; }
+    #lightbox { display: none; position: fixed; z-index: 9999; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.95); align-items: center; justify-content: center; }
+    #lightbox img { max-width: 90%; max-height: 90vh; border-radius: 5px; object-fit: contain; }
+    .lightbox-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; cursor: pointer; user-select: none; }
+    .lightbox-prev, .lightbox-next { position: absolute; top: 50%; transform: translateY(-50%); color: white; font-size: 50px; cursor: pointer; padding: 20px; user-select: none; }
+    .lightbox-prev { left: 10px; } .lightbox-next { right: 10px; }
+    #select-map { height: 400px; width: 100%; border-radius: 10px; }
+    
+    .memory-desc {
+        background: #f8f9fa; padding: 8px 12px; font-size: 0.9rem; color: #555; border-top: 1px solid #eee; font-style: italic; text-align: center;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <a href="/view/{{ prev_date }}" class="btn btn-outline-secondary rounded-pill shadow-sm px-3" id="prev-day-btn">&larr; Önceki</a>
+    <div class="text-center">
+        <h2 class="fw-bold m-0 text-dark">{{ pretty_date }}</h2>
+        <span class="text-muted small">{{ date_str }}</span>
+        
+        {% if location %}
+            <div class="mt-2">
+                <span class="badge bg-success">📍 {{ location.place_name }}</span>
+                <form action="/delete_location" method="post" class="d-inline" onsubmit="return confirm('Konumu kaldırmak istiyor musun?');">
+                    <input type="hidden" name="date_str" value="{{ date_str }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger border-0 p-0 ms-1">✕</button>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+    <a href="/view/{{ next_date }}" class="btn btn-outline-secondary rounded-pill shadow-sm px-3" id="next-day-btn">Sonraki &rarr;</a>
+</div>
+
+<div class="text-center mb-4 d-flex justify-content-center gap-2">
+    <button class="btn btn-outline-danger rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#manualModal">📸 Fotoğraf Ekle</button>
+    <button class="btn btn-danger rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#noteModal">📝 Not Bırak</button>
+    <button class="btn btn-outline-success rounded-pill px-4 shadow-sm" onclick="openLocationModal()">📍 Konum Ekle</button>
+</div>
+
+{% if notes %}
+<div class="row justify-content-center mb-4">
+    <div class="col-md-8">
+        <h5 class="text-muted mb-3 ms-2">💌 Günün Notları</h5>
+        {% for note in notes %}
+        <div class="note-card" oncontextmenu="showContextMenu(event, '{{ note.id }}', '{{ 1 if note.is_favorite else 0 }}', 'note')">
+            {% if note.is_favorite %}<div class="note-star">⭐</div>{% endif %}
+            <div class="note-content">“{{ note.content }}”</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+    {% set ns = namespace(img_index=0) %}
+    {% for memory in memories %}
+    <div class="col-6 col-md-4 col-lg-3">
+        <div class="memory-card h-100 position-relative" 
+             data-desc="{{ memory.description if memory.description else '' }}"
+             oncontextmenu="showContextMenu(event, '{{ memory.id }}', '{{ 1 if memory.is_favorite else 0 }}', 'memory')">
+            
+            <div style="flex-grow: 1; position: relative;">
+                {% if memory.media_type == 'image' %}
+                    <a href="javascript:void(0)" onclick="openLightbox('{{ ns.img_index }}')">
+                        <img src="{{ memory.filename }}" alt="Anı" class="gallery-img" data-src="{{ memory.filename }}">
+                    </a>
+                    {% set ns.img_index = ns.img_index + 1 %}
+                {% else %}
+                    <video controls style="width:100%; height:250px; object-fit:cover;"><source src="{{ memory.filename }}" type="video/mp4"></video>
+                {% endif %}
+            </div>
+            {% if memory.description %}
+                <div class="memory-desc">{{ memory.description }}</div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+        {% if not notes %}
+        <div class="col-12 text-center py-5">
+            <div class="alert alert-light border shadow-sm d-inline-block px-5"><p class="mb-0 text-muted fs-5">Bu tarihte henüz bir anı yok 🍂</p></div>
+        </div>
+        {% endif %}
+    {% endfor %}
+</div>
+
+<div id="lightbox"><span class="lightbox-close" onclick="closeLightbox()">&times;</span><span class="lightbox-prev" onclick="changeImage(-1)">&#10094;</span><span class="lightbox-next" onclick="changeImage(1)">&#10095;</span><img id="lightbox-img" src="" alt="Büyük Resim"></div>
+
+<div id="context-menu"><ul><li id="fav-action" onclick="handleFavorite()"><span>⭐</span> Favorilere Ekle</li><li id="album-action" onclick="openAlbumModal()"><span>📚</span> Albüme Ekle...</li><li id="comment-action" onclick="openCommentModal()"><span>✏️</span> Yorum Ekle/Düzenle</li><li onclick="handleDelete()"><span>🗑️</span> Sil</li><li onclick="hideContextMenu()"><span>✖️</span> İptal</li></ul></div>
+
+<form id="delete-memory-form" method="post" style="display: none;"></form><form id="fav-memory-form" method="post" style="display: none;"></form><form id="delete-note-form" method="post" style="display: none;"></form><form id="fav-note-form" method="post" style="display: none;"></form>
+
+<div class="modal fade" id="addToAlbumModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form action="/add_to_album" method="post"><div class="modal-header"><h5 class="modal-title">Albüme Ekle</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="memory_id" id="modal-memory-id"><label class="form-label">Hangi albüm?</label><select name="album_id" class="form-select" required>{% for album in albums %}<option value="{{ album.id }}">{{ album.name }}</option>{% else %}<option disabled>Önce albüm oluştur.</option>{% endfor %}</select></div><div class="modal-footer"><button type="submit" class="btn btn-primary">Kaydet</button></div></form></div></div></div>
+<div class="modal fade" id="manualModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form action="/upload_manual" method="post" enctype="multipart/form-data"><div class="modal-header"><h5 class="modal-title">Ekle</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="target_date" value="{{ date_str }}"><input type="file" name="file" class="form-control" required></div><div class="modal-footer"><button type="submit" class="btn btn-success">Kaydet</button></div></form></div></div></div>
+<div class="modal fade" id="noteModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form action="/save_note" method="post"><div class="modal-header"><h5 class="modal-title">Not Ekle</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="date_str" value="{{ date_str }}"><textarea name="note_content" class="form-control" rows="4" required></textarea></div><div class="modal-footer"><button type="submit" class="btn btn-danger">Kaydet</button></div></form></div></div></div>
+<div class="modal fade" id="commentModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form action="/save_memory_comment" method="post"><div class="modal-header"><h5 class="modal-title">Fotoğrafa Yorum Yap</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="memory_id" id="comment-memory-id"><div class="mb-3"><textarea name="comment" id="comment-text" class="form-control" rows="3" placeholder="Bu anın hikayesi ne?"></textarea></div></div><div class="modal-footer"><button type="submit" class="btn btn-primary">Kaydet</button></div></form></div></div></div>
+
+<div class="modal fade" id="locationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Bu Tarihe Konum Ekle</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p class="text-muted small">Haritada istediğin yere tıkla VEYA 🔍 büyütece basarak arama yap.</p>
+                <div id="select-map"></div>
+                <form action="/save_location" method="post" class="mt-3">
+                    <input type="hidden" name="date_str" value="{{ date_str }}">
+                    <input type="hidden" name="lat" id="input-lat">
+                    <input type="hidden" name="lng" id="input-lng">
+                    <div class="input-group">
+                        <span class="input-group-text">Yer Adı</span>
+                        <input type="text" name="place_name" class="form-control" placeholder="Örn: İlk Buluşma Yeri" required>
+                        <button type="submit" class="btn btn-success">Kaydet</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- MEVCUT SCRIPT (Aynı) ---
+    let allImages = []; let currentImgIndex = 0; const lightbox = document.getElementById('lightbox'); const lightboxImg = document.getElementById('lightbox-img');
+    document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.gallery-img').forEach(img => allImages.push(img.getAttribute('data-src'))); });
+    function openLightbox(index) { currentImgIndex = parseInt(index); lightboxImg.src = allImages[currentImgIndex]; lightbox.style.display = 'flex'; }
+    function closeLightbox() { lightbox.style.display = 'none'; lightboxImg.src = ''; }
+    function changeImage(step) { currentImgIndex += step; if (currentImgIndex >= allImages.length) currentImgIndex = 0; if (currentImgIndex < 0) currentImgIndex = allImages.length - 1; lightboxImg.src = allImages[currentImgIndex]; }
+    document.addEventListener('keydown', function(event) { if (document.querySelector('.modal.show')) return; if (lightbox.style.display === 'flex') { if (event.key === "ArrowLeft") changeImage(-1); if (event.key === "ArrowRight") changeImage(1); if (event.key === "Escape") closeLightbox(); } else { if (event.key === "ArrowLeft") document.getElementById('prev-day-btn').click(); if (event.key === "ArrowRight") document.getElementById('next-day-btn').click(); } });
+
+    let currentId = null; let currentType = null; let currentDesc = ''; const menu = document.getElementById('context-menu'); const favAction = document.getElementById('fav-action'); const albumAction = document.getElementById('album-action'); const commentAction = document.getElementById('comment-action');
+    function showContextMenu(event, id, isFavStr, type) { 
+        event.preventDefault(); currentId = id; currentType = type; currentDesc = event.currentTarget.getAttribute('data-desc') || '';
+        const isFavorite = (isFavStr === '1'); if (isFavorite) favAction.innerHTML = '<span>💔</span> Favorilerden Çıkar'; else favAction.innerHTML = '<span>⭐</span> Favorilere Ekle'; 
+        if (type === 'memory') { albumAction.style.display = 'flex'; commentAction.style.display = 'flex'; } else { albumAction.style.display = 'none'; commentAction.style.display = 'none'; }
+        menu.style.top = `${event.pageY}px`; menu.style.left = `${event.pageX}px`; menu.style.display = 'block'; 
+    }
+    function openCommentModal() { document.getElementById('comment-memory-id').value = currentId; document.getElementById('comment-text').value = currentDesc; var myModal = new bootstrap.Modal(document.getElementById('commentModal')); myModal.show(); hideContextMenu(); }
+    function handleFavorite() { if (currentType === 'memory') { const f = document.getElementById('fav-memory-form'); f.action = '/toggle_favorite/' + currentId; f.submit(); } else { const f = document.getElementById('fav-note-form'); f.action = '/toggle_note_favorite/' + currentId; f.submit(); } }
+    function handleDelete() { if (confirm('Silinecek mi?')) { if (currentType === 'memory') { const f = document.getElementById('delete-memory-form'); f.action = '/delete/' + currentId; f.submit(); } else { const f = document.getElementById('delete-note-form'); f.action = '/delete_note/' + currentId; f.submit(); } } }
+    function openAlbumModal() { document.getElementById('modal-memory-id').value = currentId; var myModal = new bootstrap.Modal(document.getElementById('addToAlbumModal')); myModal.show(); hideContextMenu(); }
+    function hideContextMenu() { menu.style.display = 'none'; }
+    document.addEventListener('click', function() { if(menu.style.display === 'block') hideContextMenu(); });
+
+    // --- YENİ: KONUM SEÇİCİ (ARAMALI) ---
+    let selectMap = null; let tempMarker = null;
+    function openLocationModal() {
+        var myModal = new bootstrap.Modal(document.getElementById('locationModal'));
+        myModal.show();
+        document.getElementById('locationModal').addEventListener('shown.bs.modal', function () {
+            if (!selectMap) {
+                selectMap = L.map('select-map').setView([39.9334, 32.8597], 6);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(selectMap);
+                
+                // Arama Kontrolünü Ekle
+                L.Control.geocoder({ defaultMarkGeocode: false })
+                .on('markgeocode', function(e) {
+                    var lat = e.geocode.center.lat; var lng = e.geocode.center.lng;
+                    selectMap.setView([lat, lng], 13);
+                    document.getElementById('input-lat').value = lat; document.getElementById('input-lng').value = lng;
+                    
+                    // Arama sonucunu 'Yer Adı' kutusuna da yazalım, kolaylık olsun
+                    document.querySelector('input[name="place_name"]').value = e.geocode.name;
+
+                    if (tempMarker) selectMap.removeLayer(tempMarker);
+                    tempMarker = L.marker([lat, lng]).addTo(selectMap);
+                }).addTo(selectMap);
+
+                // Tıklayarak Seçme
+                selectMap.on('click', function(e) {
+                    var lat = e.latlng.lat; var lng = e.latlng.lng;
+                    document.getElementById('input-lat').value = lat; document.getElementById('input-lng').value = lng;
+                    if (tempMarker) selectMap.removeLayer(tempMarker);
+                    tempMarker = L.marker([lat, lng]).addTo(selectMap);
+                });
+            }
+        });
+    }
+</script>
+
+{% endblock %}

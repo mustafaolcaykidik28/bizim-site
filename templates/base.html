@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <title>Bizim Hikayemiz</title>
+
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#dc3545"> <meta name="apple-mobile-web-app-capable" content="yes"> <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes"> <meta name="application-name" content="Bizim Hikayemiz">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <style>
+        body { 
+            background-color: #fff0f3; /* Tatlı Pembe Arka Plan */
+            font-family: 'Segoe UI', sans-serif;
+            /* Mobilde aşağı çekince yenilemeyi engelle (Uygulama hissi için) */
+            overscroll-behavior-y: none; 
+        }
+        
+        /* Navbar Tasarımı */
+        .navbar { 
+            background-color: white; 
+            border-bottom: 2px solid #ffccd5; 
+            padding-top: 15px;
+            padding-bottom: 15px;
+        }
+
+        /* Kart Tasarımı */
+        .memory-card { 
+            overflow: hidden; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+            background: white;
+        }
+        .memory-card img, .memory-card video { 
+            width: 100%; 
+            height: 250px; 
+            object-fit: cover; 
+            transition: transform 0.3s;
+        }
+        .memory-card:hover img { 
+            transform: scale(1.05); 
+        }
+
+        /* Mobil Uyumlu Buton Grubu */
+        .btn-navbar {
+            font-weight: bold;
+            border-radius: 50px;
+            padding: 8px 20px;
+        }
+
+        /* Mobilde Başlık ve Butonların Sıkışmaması İçin */
+        @media (max-width: 768px) {
+            .navbar .container {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .navbar-brand {
+                margin: 0 !important;
+                position: static !important;
+                transform: none !important;
+            }
+            .nav-buttons {
+                display: flex;
+                gap: 5px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .btn-navbar {
+                font-size: 0.9rem;
+                padding: 6px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-light mb-4 shadow-sm sticky-top">
+        <div class="container position-relative d-flex justify-content-center align-items-center">
+            
+            <a class="navbar-brand fs-3 fw-bold text-danger position-absolute top-50 start-50 translate-middle m-0 d-none d-md-block" href="/">
+                ❤️ Bizim Hikayemiz
+            </a>
+            <a class="navbar-brand fs-4 fw-bold text-danger d-block d-md-none" href="/">
+                ❤️ Bizim Hikayemiz
+            </a>
+
+            <div class="nav-buttons d-flex gap-2 w-100 justify-content-center justify-content-md-start">
+                <a href="/" class="btn btn-outline-danger btn-navbar">🏠 Ana Sayfa</a>
+                <a href="/favorites" class="btn btn-warning text-white btn-navbar">⭐ Favoriler</a>
+                <a href="/albums" class="btn btn-info text-white btn-navbar">📚 Albümler</a>
+            </div>
+
+        </div>
+    </nav>
+
+    <div class="container pb-5">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

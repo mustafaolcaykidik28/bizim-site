@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10 text-center mb-4">
+        <h1 class="text-success fw-bold">🌍 Aşk Haritası</h1>
+        <p class="text-muted">Birlikte ayak bastığımız yerler...</p>
+    </div>
+</div>
+
+<div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+    <div id="big-map" style="height: 600px; width: 100%;"></div>
+</div>
+
+<script>
+    // Haritayı başlat
+    var map = L.map('big-map').setView([39.9334, 32.8597], 6);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // YENİ: ARAMA KUTUSU EKLENTİSİ
+    L.Control.geocoder({
+        defaultMarkGeocode: false
+    })
+    .on('markgeocode', function(e) {
+        var bbox = e.geocode.bbox;
+        var poly = L.polygon([
+            bbox.getSouthEast(),
+            bbox.getNorthEast(),
+            bbox.getNorthWest(),
+            bbox.getSouthWest()
+        ]);
+        map.fitBounds(poly.getBounds());
+    })
+    .addTo(map);
+
+    // Pinleri Çek
+    fetch('/api/pins')
+        .then(response => response.json())
+        .then(data => {
+            data.forEach(pin => {
+                var marker = L.marker([pin.lat, pin.lng]).addTo(map);
+                var popupContent = `
+                    <div class="text-center">
+                        <strong>${pin.place_name || 'İsimsiz Konum'}</strong><br>
+                        <small>${pin.date_str}</small><br>
+                        <a href="/view/${pin.date_str}" class="btn btn-sm btn-danger mt-2 text-white">Anılara Git</a>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+            });
+        });
+</script>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    #context-menu { display: none; position: absolute; z-index: 1000; background: white; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); border: 1px solid #eee; min-width: 180px; }
+    #context-menu ul { list-style: none; margin: 0; padding: 0; }
+    #context-menu li { padding: 12px 20px; cursor: pointer; color: #333; display: flex; align-items: center; border-bottom: 1px solid #f8f9fa;}
+    #context-menu li:last-child { border-bottom: none; }
+    #context-menu li:hover { background-color: #fff0f3; color: #dc3545; }
+    #context-menu li span { margin-right: 10px; font-size: 1.2rem; }
+    
+    .note-card { background-color: #fff3cd; border-left: 5px solid #ffecb5; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .note-content { font-family: 'Segoe UI', sans-serif; font-size: 1.1rem; color: #555; white-space: pre-wrap; }
+
+    #lightbox { display: none; position: fixed; z-index: 9999; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.95); align-items: center; justify-content: center; }
+    #lightbox img { max-width: 90%; max-height: 90vh; border-radius: 5px; object-fit: contain; }
+    .lightbox-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; cursor: pointer; }
+    .lightbox-prev, .lightbox-next { position: absolute; top: 50%; transform: translateY(-50%); color: white; font-size: 50px; cursor: pointer; padding: 20px; }
+    .lightbox-prev { left: 10px; } .lightbox-next { right: 10px; }
+</style>
+
+<div class="text-center mb-5">
+    <h1 class="text-warning fw-bold">⭐ Favorilerim</h1>
+    <p class="text-muted">En sevdiğimiz anlar...</p>
+</div>
+
+{% if notes %}
+<h4 class="text-muted mb-3">📝 Notlar</h4>
+<div class="row mb-5">
+    {% for note in notes %}
+    <div class="col-md-6">
+        <div class="note-card" oncontextmenu="showContextMenu(event, '{{ note.id }}', 'note')">
+            <div class="note-content">“{{ note.content }}”</div>
+            <small class="text-muted d-block mt-2 text-end">{{ note.date_str }}</small>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if memories %}
+<h4 class="text-muted mb-3">📸 Fotoğraflar</h4>
+<div class="row g-3">
+    {% set ns = namespace(img_index=0) %}
+    {% for memory in memories %}
+    <div class="col-6 col-md-4 col-lg-3">
+        <div class="memory-card h-100 position-relative" oncontextmenu="showContextMenu(event, '{{ memory.id }}', 'memory')">
+            {% if memory.media_type == 'image' %}
+                <a href="javascript:void(0)" onclick="openLightbox('{{ ns.img_index }}')">
+                    <img src="{{ url_for('static', filename='uploads/' + memory.filename) }}" alt="Anı" class="gallery-img" data-src="{{ url_for('static', filename='uploads/' + memory.filename) }}">
+                </a>
+                {% set ns.img_index = ns.img_index + 1 %}
+            {% else %}
+                <video controls style="width:100%; height:250px; object-fit:cover;"><source src="{{ url_for('static', filename='uploads/' + memory.filename) }}" type="video/mp4"></video>
+            {% endif %}
+            <div class="text-center mt-1"><small class="text-muted">{{ memory.date_str }}</small></div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if not notes and not memories %}
+<div class="text-center py-5"><p class="fs-4 text-muted">Henüz favori eklenmemiş.</p></div>
+{% endif %}
+
+<div id="lightbox">
+    <span class="lightbox-close" onclick="closeLightbox()">&times;</span>
+    <span class="lightbox-prev" onclick="changeImage(-1)">&#10094;</span>
+    <span class="lightbox-next" onclick="changeImage(1)">&#10095;</span>
+    <img id="lightbox-img" src="" alt="Büyük Resim">
+</div>
+
+<div id="context-menu">
+    <ul>
+        <li onclick="handleFavorite()"><span>💔</span> Favorilerden Çıkar</li>
+        <li onclick="hideContextMenu()"><span>✖️</span> İptal</li>
+    </ul>
+</div>
+
+<form id="fav-memory-form" method="post" style="display: none;"></form>
+<form id="fav-note-form" method="post" style="display: none;"></form>
+
+<script>
+    let allImages = []; let currentImgIndex = 0; const lightbox = document.getElementById('lightbox'); const lightboxImg = document.getElementById('lightbox-img');
+    document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.gallery-img').forEach(img => allImages.push(img.getAttribute('data-src'))); });
+    function openLightbox(index) { currentImgIndex = parseInt(index); lightboxImg.src = allImages[currentImgIndex]; lightbox.style.display = 'flex'; }
+    function closeLightbox() { lightbox.style.display = 'none'; lightboxImg.src = ''; }
+    function changeImage(step) { currentImgIndex += step; if (currentImgIndex >= allImages.length) currentImgIndex = 0; if (currentImgIndex < 0) currentImgIndex = allImages.length - 1; lightboxImg.src = allImages[currentImgIndex]; }
+    document.addEventListener('keydown', function(event) { if (lightbox.style.display === 'flex') { if (event.key === "ArrowLeft") changeImage(-1); if (event.key === "ArrowRight") changeImage(1); if (event.key === "Escape") closeLightbox(); } });
+
+    let currentId = null; let currentType = null; const menu = document.getElementById('context-menu');
+    function showContextMenu(event, id, type) { event.preventDefault(); currentId = id; currentType = type; menu.style.top = `${event.pageY}px`; menu.style.left = `${event.pageX}px`; menu.style.display = 'block'; }
+    function handleFavorite() { if (currentType === 'memory') { const f = document.getElementById('fav-memory-form'); f.action = '/toggle_favorite/' + currentId; f.submit(); } else { const f = document.getElementById('fav-note-form'); f.action = '/toggle_note_favorite/' + currentId; f.submit(); } }
+    function hideContextMenu() { menu.style.display = 'none'; }
+    document.addEventListener('click', function() { if(menu.style.display === 'block') hideContextMenu(); });
+</script>
+{% endblock %}

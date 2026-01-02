@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 text-center mb-4">
+        <h1 class="text-primary fw-bold">📝 Birlikte Yapılacaklar Listesi</h1>
+        <p class="text-muted">Birlikte gerçekleştireceğimiz hayaller...</p>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card p-4 shadow border-0 mb-5" style="border-radius: 20px; background-color: #fffaf0;">
+            
+            <form action="/add_bucket_item" method="post" class="mb-4">
+                <div class="input-group input-group-lg">
+                    <input type="text" name="content" class="form-control rounded-start-pill ps-4" placeholder="Yeni bir hedef ekle..." required>
+                    <button type="submit" class="btn btn-primary rounded-end-pill px-4">Ekle</button>
+                </div>
+            </form>
+
+            <ul class="list-group list-group-flush text-start rounded-3">
+                {% for item in bucket_items %}
+                <li class="list-group-item d-flex justify-content-between align-items-center py-3" style="background-color: rgba(255,255,255,0.7);">
+                    
+                    <span class="fs-5 {% if item.is_done %}text-decoration-line-through text-muted{% endif %}">
+                        {{ item.content }}
+                    </span>
+
+                    <div class="d-flex gap-2">
+                        <a href="/toggle_bucket_item/{{ item.id }}" class="btn btn-sm {% if item.is_done %}btn-secondary{% else %}btn-outline-success{% endif %} rounded-circle" title="Tamamla / Geri Al">
+                            {% if item.is_done %}↩️{% else %}✔️{% endif %}
+                        </a>
+                        
+                        <a href="/delete_bucket_item/{{ item.id }}" class="btn btn-sm btn-outline-danger rounded-circle" title="Sil" onclick="return confirm('Bu maddeyi silmek istiyor musun?');">
+                            ✕
+                        </a>
+                    </div>
+                </li>
+                {% else %}
+                <li class="list-group-item text-center text-muted py-4">
+                    Henüz bir hedef eklemediniz. Hadi başlayalım! 🚀
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        
+        <div class="text-center">
+            <a href="/" class="btn btn-outline-secondary rounded-pill px-4">← Ana Sayfaya Dön</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
