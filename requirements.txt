@@ -1,0 +1,5 @@
+Flask
+gunicorn
+cloudinary
+Flask-SQLAlchemy
+Flask-Cors
