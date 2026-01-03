@@ -3,3 +3,4 @@ gunicorn
 cloudinary
 Flask-SQLAlchemy
 Flask-Cors
+pillow
