@@ -29,11 +29,14 @@ app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024
 
 # --- ☁️ CLOUDINARY AYARLARI ---
 # Hem environment değişkeni hem de config ile çift dikiş atıyoruz
+import cloudinary
+
+# BURAYI KOPYALA VE ESKİSİNİN YERİNE YAPIŞTIR
 cloudinary.config(
-    cloud_name = "root", 
-    api_key = "326246576888513", 
-    api_secret = "MgWuIddS2CZHmjdOqubHuLR6sC4",
-    api_proxy = "http://proxy.server:3128"
+  cloud_name = "olcay",
+  api_key = "326246576888513",
+  api_secret = "MgWuIddS2CZHmjdOq",
+  secure = True
 )
 
 # --- ❤️ TARİH AYARI ---
@@ -415,4 +418,5 @@ def map_page():
     return render_template('map.html')
 
 if __name__ == '__main__':
+
     app.run(host='0.0.0.0', port=5000, debug=True)
