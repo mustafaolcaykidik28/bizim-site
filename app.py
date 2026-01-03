@@ -35,7 +35,7 @@ import cloudinary
 cloudinary.config(
   cloud_name = "olcay",
   api_key = "326246576888513",
-  api_secret = "MgWuIddS2CZHmjdOq",
+  api_secret = "MgWuIddS2CZHmjdOqubHuLR6sC4",
   secure = True
 )
 
@@ -420,3 +420,4 @@ def map_page():
 if __name__ == '__main__':
 
     app.run(host='0.0.0.0', port=5000, debug=True)
+
