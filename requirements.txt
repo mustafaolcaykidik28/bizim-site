@@ -4,3 +4,4 @@ cloudinary
 Flask-SQLAlchemy
 Flask-Cors
 pillow
+psycopg2-binary
