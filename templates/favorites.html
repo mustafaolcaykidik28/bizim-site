@@ -45,14 +45,18 @@
     {% for memory in memories %}
     <div class="col-6 col-md-4 col-lg-3">
         <div class="memory-card h-100 position-relative" oncontextmenu="showContextMenu(event, '{{ memory.id }}', 'memory')">
+            
             {% if memory.media_type == 'image' %}
                 <a href="javascript:void(0)" onclick="openLightbox('{{ ns.img_index }}')">
-                    <img src="{{ url_for('static', filename='uploads/' + memory.filename) }}" alt="Anı" class="gallery-img" data-src="{{ url_for('static', filename='uploads/' + memory.filename) }}">
+                    <img src="{{ memory.filename }}" alt="Anı" class="gallery-img" data-src="{{ memory.filename }}">
                 </a>
                 {% set ns.img_index = ns.img_index + 1 %}
             {% else %}
-                <video controls style="width:100%; height:250px; object-fit:cover;"><source src="{{ url_for('static', filename='uploads/' + memory.filename) }}" type="video/mp4"></video>
+                <video controls style="width:100%; height:250px; object-fit:cover;">
+                    <source src="{{ memory.filename }}" type="video/mp4">
+                </video>
             {% endif %}
+            
             <div class="text-center mt-1"><small class="text-muted">{{ memory.date_str }}</small></div>
         </div>
     </div>
@@ -83,6 +87,7 @@
 
 <script>
     let allImages = []; let currentImgIndex = 0; const lightbox = document.getElementById('lightbox'); const lightboxImg = document.getElementById('lightbox-img');
+    // data-src kısmı düzeltildiği için lightbox da artık çalışacak
     document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.gallery-img').forEach(img => allImages.push(img.getAttribute('data-src'))); });
     function openLightbox(index) { currentImgIndex = parseInt(index); lightboxImg.src = allImages[currentImgIndex]; lightbox.style.display = 'flex'; }
     function closeLightbox() { lightbox.style.display = 'none'; lightboxImg.src = ''; }
