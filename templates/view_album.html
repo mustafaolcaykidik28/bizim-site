@@ -9,7 +9,6 @@
         box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
         background: white;
         transition: transform 0.2s;
-        position: relative; /* Silme butonu için gerekli */
     }
     .memory-card:hover { transform: translateY(-5px); }
     
@@ -20,28 +19,24 @@
         cursor: pointer;
     }
 
-    /* Silme Butonu (Fotoğrafın sağ üst köşesi) */
-    .remove-btn {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: rgba(220, 53, 69, 0.9); /* Kırmızı */
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        font-weight: bold;
-        cursor: pointer;
-        z-index: 10;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.3s;
+    /* SAĞ TIK MENÜSÜ TASARIMI */
+    #context-menu { 
+        display: none; 
+        position: absolute; 
+        z-index: 1000; 
+        background: white; 
+        border-radius: 8px; 
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2); 
+        border: 1px solid #eee; 
+        min-width: 180px; 
     }
-    .remove-btn:hover { background: #c82333; }
+    #context-menu ul { list-style: none; margin: 0; padding: 0; }
+    #context-menu li { padding: 12px 20px; cursor: pointer; color: #333; display: flex; align-items: center; border-bottom: 1px solid #f8f9fa;}
+    #context-menu li:last-child { border-bottom: none; }
+    #context-menu li:hover { background-color: #fff0f3; color: #dc3545; }
+    #context-menu li span { margin-right: 10px; font-size: 1.2rem; }
 
-    /* Lightbox (Büyük Resim) */
+    /* Lightbox */
     #lightbox { display: none; position: fixed; z-index: 9999; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.95); align-items: center; justify-content: center; }
     #lightbox img { max-width: 90%; max-height: 90vh; border-radius: 5px; object-fit: contain; }
     .lightbox-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; cursor: pointer; }
@@ -57,10 +52,10 @@
             ⚙️ Albümü Yönet
         </button>
         <ul class="dropdown-menu dropdown-menu-end shadow">
-            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editCoverModal">🖼️ Kapak Fotoğrafını Değiştir</a></li>
+            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editCoverModal">🖼️ Kapağı Değiştir</a></li>
             <li><hr class="dropdown-divider"></li>
             <li>
-                <form action="{{ url_for('delete_album', id=album.id) }}" method="POST" onsubmit="return confirm('Bu albümü silmek istediğine emin misin? (İçindeki fotoğraflar silinmez, sadece albüm klasörü gider.)');">
+                <form action="{{ url_for('delete_album', id=album.id) }}" method="POST" onsubmit="return confirm('Bu albümü silmek istediğine emin misin?');">
                     <button type="submit" class="dropdown-item text-danger">🗑️ Albümü Sil</button>
                 </form>
             </li>
@@ -77,14 +72,8 @@
     {% set ns = namespace(img_index=0) %}
     {% for memory in album.memories %}
     <div class="col-6 col-md-4 col-lg-3">
-        <div class="memory-card h-100">
+        <div class="memory-card h-100" oncontextmenu="showContextMenu(event, '{{ memory.id }}')">
             
-            <form action="{{ url_for('remove_from_album') }}" method="POST" onsubmit="return confirm('Bu fotoğrafı albümden çıkarmak istediğine emin misin?');">
-                <input type="hidden" name="album_id" value="{{ album.id }}">
-                <input type="hidden" name="memory_id" value="{{ memory.id }}">
-                <button type="submit" class="remove-btn" title="Albümden Çıkar">×</button>
-            </form>
-
             {% if memory.media_type == 'image' %}
                 <a href="javascript:void(0)" onclick="openLightbox('{{ ns.img_index }}')">
                     <img src="{{ memory.filename }}" alt="Anı" class="gallery-img" data-src="{{ memory.filename }}">
@@ -105,11 +94,21 @@
     <div class="col-12 text-center py-5">
         <div class="display-1 text-muted">📭</div>
         <p class="fs-4 text-muted mt-3">Bu albüm henüz boş.</p>
-        <p>Anılarınıza gidip "Albume Ekle" diyerek burayı doldurabilirsiniz.</p>
-        <a href="/" class="btn btn-danger rounded-pill">Anılara Git</a>
     </div>
     {% endfor %}
 </div>
+
+<div id="context-menu">
+    <ul>
+        <li onclick="removeFromAlbum()"><span>🗑️</span> Albümden Çıkar</li>
+        <li onclick="hideContextMenu()"><span>✖️</span> İptal</li>
+    </ul>
+</div>
+
+<form id="remove-form" action="{{ url_for('remove_from_album') }}" method="POST" style="display: none;">
+    <input type="hidden" name="album_id" value="{{ album.id }}">
+    <input type="hidden" name="memory_id" id="target-memory-id">
+</form>
 
 <div class="modal fade" id="editCoverModal" tabindex="-1">
     <div class="modal-dialog">
@@ -142,12 +141,12 @@
 </div>
 
 <script>
+    // --- LIGHTBOX JS ---
     let allImages = []; 
     let currentImgIndex = 0; 
     const lightbox = document.getElementById('lightbox'); 
     const lightboxImg = document.getElementById('lightbox-img');
     
-    // Sayfa yüklenince resimleri topla
     document.addEventListener('DOMContentLoaded', () => { 
         document.querySelectorAll('.gallery-img').forEach(img => {
             allImages.push(img.getAttribute('data-src'));
@@ -159,26 +158,49 @@
         lightboxImg.src = allImages[currentImgIndex]; 
         lightbox.style.display = 'flex'; 
     }
-
-    function closeLightbox() { 
-        lightbox.style.display = 'none'; 
-        lightboxImg.src = ''; 
-    }
-
+    function closeLightbox() { lightbox.style.display = 'none'; lightboxImg.src = ''; }
     function changeImage(step) { 
         currentImgIndex += step; 
         if (currentImgIndex >= allImages.length) currentImgIndex = 0; 
         if (currentImgIndex < 0) currentImgIndex = allImages.length - 1; 
         lightboxImg.src = allImages[currentImgIndex]; 
     }
-
-    // Klavye tuşları
     document.addEventListener('keydown', function(event) { 
         if (lightbox.style.display === 'flex') { 
             if (event.key === "ArrowLeft") changeImage(-1); 
             if (event.key === "ArrowRight") changeImage(1); 
             if (event.key === "Escape") closeLightbox(); 
         } 
+    });
+
+    // --- SAĞ TIK MENÜSÜ JS ---
+    let targetMemoryId = null;
+    const menu = document.getElementById('context-menu');
+
+    function showContextMenu(event, id) { 
+        event.preventDefault(); 
+        targetMemoryId = id; 
+        
+        // Menüyü farenin olduğu yerde aç
+        menu.style.top = `${event.pageY}px`; 
+        menu.style.left = `${event.pageX}px`; 
+        menu.style.display = 'block'; 
+    }
+
+    function removeFromAlbum() {
+        if (targetMemoryId && confirm('Bu fotoğrafı albümden çıkarmak istediğine emin misin?')) {
+            document.getElementById('target-memory-id').value = targetMemoryId;
+            document.getElementById('remove-form').submit();
+        }
+    }
+
+    function hideContextMenu() { 
+        menu.style.display = 'none'; 
+    }
+
+    // Başka yere tıklayınca menüyü kapat
+    document.addEventListener('click', function(e) { 
+        if(menu.style.display === 'block') hideContextMenu(); 
     });
 </script>
 {% endblock %}
