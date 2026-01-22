@@ -2,6 +2,46 @@
 
 {% block content %}
 <style>
+    /* Kart Tasarımı */
+    .memory-card { 
+        overflow: hidden; 
+        border-radius: 12px; 
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+        background: white;
+        transition: transform 0.2s;
+        position: relative; /* Silme butonu için gerekli */
+    }
+    .memory-card:hover { transform: translateY(-5px); }
+    
+    .gallery-img { 
+        width: 100%; 
+        height: 250px; 
+        object-fit: cover; 
+        cursor: pointer;
+    }
+
+    /* Silme Butonu (Fotoğrafın sağ üst köşesi) */
+    .remove-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(220, 53, 69, 0.9); /* Kırmızı */
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        font-weight: bold;
+        cursor: pointer;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.3s;
+    }
+    .remove-btn:hover { background: #c82333; }
+
+    /* Lightbox (Büyük Resim) */
     #lightbox { display: none; position: fixed; z-index: 9999; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.95); align-items: center; justify-content: center; }
     #lightbox img { max-width: 90%; max-height: 90vh; border-radius: 5px; object-fit: contain; }
     .lightbox-close { position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; cursor: pointer; }
@@ -9,9 +49,28 @@
     .lightbox-prev { left: 10px; } .lightbox-next { right: 10px; }
 </style>
 
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <a href="/albums" class="btn btn-outline-secondary btn-sm rounded-pill">← Albümlere Dön</a>
+    
+    <div class="dropdown">
+        <button class="btn btn-outline-danger btn-sm dropdown-toggle rounded-pill" type="button" data-bs-toggle="dropdown">
+            ⚙️ Albümü Yönet
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow">
+            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#editCoverModal">🖼️ Kapak Fotoğrafını Değiştir</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+                <form action="{{ url_for('delete_album', id=album.id) }}" method="POST" onsubmit="return confirm('Bu albümü silmek istediğine emin misin? (İçindeki fotoğraflar silinmez, sadece albüm klasörü gider.)');">
+                    <button type="submit" class="dropdown-item text-danger">🗑️ Albümü Sil</button>
+                </form>
+            </li>
+        </ul>
+    </div>
+</div>
+
 <div class="text-center mb-5">
-    <h1 class="fw-bold">{{ album.name }}</h1>
-    <a href="/albums" class="btn btn-outline-secondary btn-sm rounded-pill mt-2">← Albümlere Dön</a>
+    <h1 class="fw-bold text-danger">{{ album.name }}</h1>
+    <p class="text-muted small">{{ album.memories|length }} anı biriktirdik.</p>
 </div>
 
 <div class="row g-3">
@@ -19,20 +78,60 @@
     {% for memory in album.memories %}
     <div class="col-6 col-md-4 col-lg-3">
         <div class="memory-card h-100">
+            
+            <form action="{{ url_for('remove_from_album') }}" method="POST" onsubmit="return confirm('Bu fotoğrafı albümden çıkarmak istediğine emin misin?');">
+                <input type="hidden" name="album_id" value="{{ album.id }}">
+                <input type="hidden" name="memory_id" value="{{ memory.id }}">
+                <button type="submit" class="remove-btn" title="Albümden Çıkar">×</button>
+            </form>
+
             {% if memory.media_type == 'image' %}
                 <a href="javascript:void(0)" onclick="openLightbox('{{ ns.img_index }}')">
-                    <img src="{{ url_for('static', filename='uploads/' + memory.filename) }}" alt="Anı" class="gallery-img" data-src="{{ url_for('static', filename='uploads/' + memory.filename) }}">
+                    <img src="{{ memory.filename }}" alt="Anı" class="gallery-img" data-src="{{ memory.filename }}">
                 </a>
                 {% set ns.img_index = ns.img_index + 1 %}
             {% else %}
-                <video controls style="width:100%; height:250px; object-fit:cover;"><source src="{{ url_for('static', filename='uploads/' + memory.filename) }}" type="video/mp4"></video>
+                <video controls style="width:100%; height:250px; object-fit:cover;">
+                    <source src="{{ memory.filename }}" type="video/mp4">
+                </video>
             {% endif %}
-            <div class="text-center mt-1"><small class="text-muted">{{ memory.date_str }}</small></div>
+            
+            <div class="text-center mt-1 pb-2 border-top pt-1">
+                <small class="text-muted">{{ memory.date_str }}</small>
+            </div>
         </div>
     </div>
     {% else %}
-    <div class="col-12 text-center py-5"><p class="text-muted">Bu albüm boş.</p></div>
+    <div class="col-12 text-center py-5">
+        <div class="display-1 text-muted">📭</div>
+        <p class="fs-4 text-muted mt-3">Bu albüm henüz boş.</p>
+        <p>Anılarınıza gidip "Albume Ekle" diyerek burayı doldurabilirsiniz.</p>
+        <a href="/" class="btn btn-danger rounded-pill">Anılara Git</a>
+    </div>
     {% endfor %}
+</div>
+
+<div class="modal fade" id="editCoverModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Albüm Kapağını Değiştir</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('update_album_cover', id=album.id) }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Yeni bir kapak fotoğrafı seç:</label>
+                        <input type="file" class="form-control" name="cover_image" required accept="image/*">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" class="btn btn-danger">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <div id="lightbox">
@@ -43,11 +142,43 @@
 </div>
 
 <script>
-    let allImages = []; let currentImgIndex = 0; const lightbox = document.getElementById('lightbox'); const lightboxImg = document.getElementById('lightbox-img');
-    document.addEventListener('DOMContentLoaded', () => { document.querySelectorAll('.gallery-img').forEach(img => allImages.push(img.getAttribute('data-src'))); });
-    function openLightbox(index) { currentImgIndex = parseInt(index); lightboxImg.src = allImages[currentImgIndex]; lightbox.style.display = 'flex'; }
-    function closeLightbox() { lightbox.style.display = 'none'; lightboxImg.src = ''; }
-    function changeImage(step) { currentImgIndex += step; if (currentImgIndex >= allImages.length) currentImgIndex = 0; if (currentImgIndex < 0) currentImgIndex = allImages.length - 1; lightboxImg.src = allImages[currentImgIndex]; }
-    document.addEventListener('keydown', function(event) { if (lightbox.style.display === 'flex') { if (event.key === "ArrowLeft") changeImage(-1); if (event.key === "ArrowRight") changeImage(1); if (event.key === "Escape") closeLightbox(); } });
+    let allImages = []; 
+    let currentImgIndex = 0; 
+    const lightbox = document.getElementById('lightbox'); 
+    const lightboxImg = document.getElementById('lightbox-img');
+    
+    // Sayfa yüklenince resimleri topla
+    document.addEventListener('DOMContentLoaded', () => { 
+        document.querySelectorAll('.gallery-img').forEach(img => {
+            allImages.push(img.getAttribute('data-src'));
+        }); 
+    });
+
+    function openLightbox(index) { 
+        currentImgIndex = parseInt(index); 
+        lightboxImg.src = allImages[currentImgIndex]; 
+        lightbox.style.display = 'flex'; 
+    }
+
+    function closeLightbox() { 
+        lightbox.style.display = 'none'; 
+        lightboxImg.src = ''; 
+    }
+
+    function changeImage(step) { 
+        currentImgIndex += step; 
+        if (currentImgIndex >= allImages.length) currentImgIndex = 0; 
+        if (currentImgIndex < 0) currentImgIndex = allImages.length - 1; 
+        lightboxImg.src = allImages[currentImgIndex]; 
+    }
+
+    // Klavye tuşları
+    document.addEventListener('keydown', function(event) { 
+        if (lightbox.style.display === 'flex') { 
+            if (event.key === "ArrowLeft") changeImage(-1); 
+            if (event.key === "ArrowRight") changeImage(1); 
+            if (event.key === "Escape") closeLightbox(); 
+        } 
+    });
 </script>
 {% endblock %}
