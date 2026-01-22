@@ -1,7 +1,7 @@
 import os
-# Render'da proxy ayarına gerek yok, o satırları kaldırdım
+from functools import wraps
 from flask_cors import CORS
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 import time
@@ -16,11 +16,15 @@ import cloudinary.api
 app = Flask(__name__)
 CORS(app)
 
-# --- AYARLAR ---
-app.config['SECRET_KEY'] = 'ozel_anahtar_buraya'
+# --- AYARLAR & GÜVENLİK ---
+app.config['SECRET_KEY'] = 'ozel_anahtar_buraya_cok_gizli'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365) # 1 Yıl boyunca giriş hatırlanır
 
-# --- 🐘 VERİTABANI BAĞLANTISI (PostgreSQL + SQLite) ---
-# Render'daki veritabanı adresini alır, yoksa yerel veritabanını kullanır
+# --- KULLANICI BİLGİLERİ ---
+USER_LOGIN = "Sudis"
+USER_PASS = "280126"
+
+# --- 🐘 VERİTABANI BAĞLANTISI ---
 database_url = os.environ.get('DATABASE_URL')
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
@@ -44,6 +48,15 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
 db = SQLAlchemy(app)
+
+# --- GİRİŞ KONTROL MEKANİZMASI ---
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # --- TABLOLAR & MODELLER ---
 album_memories = db.Table('album_memories',
@@ -115,8 +128,28 @@ def get_date_from_file(file_path, filename):
     timestamp = os.path.getmtime(file_path)
     return datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
 
-# --- API ROTASI ---
+# --- GİRİŞ / ÇIKIŞ ROTALARI ---
+
+@app.route('/login', methods=['GET', 'POST'])
+def login_page():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        if username == USER_LOGIN and password == USER_PASS:
+            session.permanent = True
+            session['logged_in'] = True
+            return redirect(url_for('index'))
+        return render_template('login.html', error="Hatalı Kullanıcı Adı veya Şifre!")
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login_page'))
+
+# --- API ROTASI (Giriş Korumalı) ---
 @app.route('/api/home_data')
+@login_required
 def api_home_data():
     today = datetime.now()
     delta = today - RELATIONSHIP_START
@@ -128,6 +161,7 @@ def api_home_data():
     })
 
 @app.route('/api/memories/<date_str>')
+@login_required
 def api_get_memories(date_str):
     memories = Memory.query.filter_by(date_str=date_str).all()
     notes = Note.query.filter_by(date_str=date_str).all()
@@ -153,6 +187,7 @@ def api_get_memories(date_str):
     return jsonify({'memories': memory_list, 'notes': note_list})
 
 @app.route('/api/bucket_list')
+@login_required
 def api_get_bucket_list():
     items = BucketList.query.order_by(BucketList.is_done, BucketList.id.desc()).all()
     data = []
@@ -165,6 +200,7 @@ def api_get_bucket_list():
     return jsonify(data)
 
 @app.route('/api/pins')
+@login_required
 def api_get_pins():
     pins = MapPin.query.all()
     pin_data = []
@@ -177,9 +213,10 @@ def api_get_pins():
         })
     return jsonify(pin_data)
 
-# --- WEB SİTESİ ROTALARI ---
+# --- WEB SİTESİ ROTALARI (Giriş Korumalı) ---
 
 @app.route('/', methods=['GET', 'POST'])
+@login_required
 def index():
     if request.method == 'POST':
         selected_date = request.form.get('date')
@@ -190,11 +227,13 @@ def index():
     return render_template('index.html', days_together=days_together)
 
 @app.route('/bucket_list')
+@login_required
 def bucket_list_page():
     bucket_items = BucketList.query.order_by(BucketList.is_done, BucketList.id.desc()).all()
     return render_template('bucket_list.html', bucket_items=bucket_items)
 
 @app.route('/add_bucket_item', methods=['POST'])
+@login_required
 def add_bucket_item():
     content = request.form.get('content')
     if content:
@@ -204,6 +243,7 @@ def add_bucket_item():
     return redirect(url_for('bucket_list_page'))
 
 @app.route('/toggle_bucket_item/<int:id>')
+@login_required
 def toggle_bucket_item(id):
     item = BucketList.query.get_or_404(id)
     item.is_done = not item.is_done 
@@ -211,6 +251,7 @@ def toggle_bucket_item(id):
     return redirect(url_for('bucket_list_page'))
 
 @app.route('/delete_bucket_item/<int:id>')
+@login_required
 def delete_bucket_item(id):
     item = BucketList.query.get_or_404(id)
     db.session.delete(item)
@@ -218,6 +259,7 @@ def delete_bucket_item(id):
     return redirect(url_for('bucket_list_page'))
 
 @app.route('/view/<date_str>')
+@login_required
 def view_date(date_str):
     memories = Memory.query.filter_by(date_str=date_str).all()
     notes = Note.query.filter_by(date_str=date_str).all()
@@ -235,6 +277,7 @@ def view_date(date_str):
     return render_template('view_date.html', memories=memories, notes=notes, albums=all_albums, location=location, date_str=date_str, pretty_date=pretty_date, prev_date=prev_date, next_date=next_date)
 
 @app.route('/save_memory_comment', methods=['POST'])
+@login_required
 def save_memory_comment():
     memory_id = request.form.get('memory_id')
     comment = request.form.get('comment')
@@ -244,6 +287,7 @@ def save_memory_comment():
     return redirect(request.referrer)
 
 @app.route('/toggle_favorite/<int:id>', methods=['POST'])
+@login_required
 def toggle_favorite(id):
     memory = Memory.query.get_or_404(id)
     memory.is_favorite = not memory.is_favorite
@@ -251,6 +295,7 @@ def toggle_favorite(id):
     return redirect(request.referrer)
 
 @app.route('/toggle_note_favorite/<int:id>', methods=['POST'])
+@login_required
 def toggle_note_favorite(id):
     note = Note.query.get_or_404(id)
     note.is_favorite = not note.is_favorite
@@ -258,24 +303,26 @@ def toggle_note_favorite(id):
     return redirect(request.referrer)
 
 @app.route('/favorites')
+@login_required
 def favorites_page():
     fav_memories = Memory.query.filter_by(is_favorite=True).all()
     fav_notes = Note.query.filter_by(is_favorite=True).all()
     return render_template('favorites.html', memories=fav_memories, notes=fav_notes)
 
 @app.route('/albums')
+@login_required
 def albums_page():
     albums = Album.query.all()
     return render_template('albums.html', albums=albums)
 
 @app.route('/create_album', methods=['POST'])
+@login_required
 def create_album():
     name = request.form.get('name')
     file = request.files.get('cover_image')
     cover_link = None
      
     if file and allowed_file(file.filename):
-        # Kapak fotoğrafını da buluta yüklüyoruz
         upload_result = cloudinary.uploader.upload(file, resource_type="auto")
         cover_link = upload_result['secure_url']
         
@@ -285,11 +332,13 @@ def create_album():
     return redirect(url_for('albums_page'))
 
 @app.route('/album/<int:id>')
+@login_required
 def view_album(id):
     album = Album.query.get_or_404(id)
     return render_template('view_album.html', album=album)
 
 @app.route('/add_to_album', methods=['POST'])
+@login_required
 def add_to_album():
     memory_id = request.form.get('memory_id')
     album_id = request.form.get('album_id')
@@ -301,8 +350,48 @@ def add_to_album():
             db.session.commit()
     return redirect(request.referrer)
 
-# --- TEKLİ YÜKLEME ---
+# --- YENİ EKLENEN ALBÜM YÖNETİM İŞLEMLERİ ---
+
+@app.route('/delete_album/<int:id>', methods=['POST'])
+@login_required
+def delete_album(id):
+    album = Album.query.get_or_404(id)
+    db.session.delete(album)
+    db.session.commit()
+    return redirect(url_for('albums_page'))
+
+@app.route('/remove_from_album', methods=['POST'])
+@login_required
+def remove_from_album():
+    album_id = request.form.get('album_id')
+    memory_id = request.form.get('memory_id')
+    album = Album.query.get(album_id)
+    memory = Memory.query.get(memory_id)
+    
+    if album and memory and memory in album.memories:
+        album.memories.remove(memory)
+        db.session.commit()
+    return redirect(url_for('view_album', id=album_id))
+
+@app.route('/update_album_cover/<int:id>', methods=['POST'])
+@login_required
+def update_album_cover(id):
+    album = Album.query.get_or_404(id)
+    file = request.files.get('cover_image')
+    
+    if file and allowed_file(file.filename):
+        try:
+            upload_result = cloudinary.uploader.upload(file, resource_type="auto")
+            album.cover_image = upload_result['secure_url']
+            db.session.commit()
+        except:
+            pass
+    return redirect(url_for('view_album', id=id))
+
+# --- DİĞER FONKSİYONLAR ---
+
 @app.route('/upload_manual', methods=['POST'])
+@login_required
 def upload_manual():
     date_str = request.form.get('target_date')
     file = request.files.get('file')
@@ -320,8 +409,8 @@ def upload_manual():
             pass
     return redirect(url_for('view_date', date_str=date_str))
 
-# --- TOPLU YÜKLEME (AKILLI) ---
 @app.route('/bulk_upload', methods=['POST'])
+@login_required
 def bulk_upload():
     files = request.files.getlist('files')
     for file in files:
@@ -352,6 +441,7 @@ def bulk_upload():
     return redirect(url_for('index'))
 
 @app.route('/delete/<int:id>', methods=['POST'])
+@login_required
 def delete_memory(id):
     memory_to_delete = Memory.query.get_or_404(id)
     db.session.delete(memory_to_delete)
@@ -359,6 +449,7 @@ def delete_memory(id):
     return redirect(request.referrer)
 
 @app.route('/save_note', methods=['POST'])
+@login_required
 def save_note():
     date_str = request.form.get('date_str')
     content = request.form.get('note_content')
@@ -369,6 +460,7 @@ def save_note():
     return redirect(url_for('view_date', date_str=date_str))
 
 @app.route('/delete_note/<int:id>', methods=['POST'])
+@login_required
 def delete_note(id):
     note = Note.query.get_or_404(id)
     date_str = note.date_str
@@ -377,6 +469,7 @@ def delete_note(id):
     return redirect(url_for('view_date', date_str=date_str))
 
 @app.route('/random_memory')
+@login_required
 def random_memory():
     all_memories = Memory.query.all()
     if not all_memories:
@@ -385,6 +478,7 @@ def random_memory():
     return redirect(url_for('view_date', date_str=random_mem.date_str))
 
 @app.route('/save_location', methods=['POST'])
+@login_required
 def save_location():
     date_str = request.form.get('date_str')
     lat = request.form.get('lat')
@@ -403,6 +497,7 @@ def save_location():
     return redirect(url_for('view_date', date_str=date_str))
 
 @app.route('/delete_location', methods=['POST'])
+@login_required
 def delete_location():
     date_str = request.form.get('date_str')
     pin = MapPin.query.filter_by(date_str=date_str).first()
@@ -412,6 +507,7 @@ def delete_location():
     return redirect(url_for('view_date', date_str=date_str))
 
 @app.route('/map')
+@login_required
 def map_page():
     return render_template('map.html')
 
