@@ -420,24 +420,28 @@ def bulk_upload():
             temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(temp_path)
             
-            # Tarihi bul
+            # Tarihi dosyadan bulmaya çalış
             detected_date = get_date_from_file(temp_path, filename)
             
-            # Buluta yükle
+            # Cloudinary'ye yükle
             upload_result = cloudinary.uploader.upload(temp_path, resource_type="auto")
             cloud_url = upload_result['secure_url']
             
             m_type = 'video' if filename.lower().endswith(('mp4', 'mov', 'avi', 'm4v')) else 'image'
+            
+            # --- DEĞİŞİKLİK BURADA ---
+            # Her fotoğrafı anında veritabanına yazıyoruz, bekletmiyoruz.
             new_memory = Memory(date_str=detected_date, filename=cloud_url, media_type=m_type)
             db.session.add(new_memory)
+            db.session.commit() # <--- Commit'i döngünün içine aldık!
             
             os.remove(temp_path)
             
         except Exception as e:
-            print(f"Toplu Yükleme Hatası: {e}")
+            print(f"Hata oluşan dosya: {file.filename} - Hata: {e}")
+            db.session.rollback() # Hata olursa veritabanını rahatlat
             pass
             
-    db.session.commit()
     return redirect(url_for('index'))
 
 @app.route('/delete/<int:id>', methods=['POST'])
@@ -513,4 +517,5 @@ def map_page():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
 
