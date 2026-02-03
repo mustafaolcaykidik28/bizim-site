@@ -18,29 +18,18 @@ CORS(app)
 
 # --- AYARLAR & GÜVENLİK ---
 app.config['SECRET_KEY'] = 'ozel_anahtar_buraya_cok_gizli'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365) 
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365) # 1 Yıl boyunca giriş hatırlanır
 
 # --- KULLANICI BİLGİLERİ ---
 USER_LOGIN = "Sudis"
 USER_PASS = "280126"
 
-# --- 🐘 VERİTABANI BAĞLANTISI (PROFESYONEL AYAR) ---
+# --- 🐘 VERİTABANI BAĞLANTISI ---
 database_url = os.environ.get('DATABASE_URL')
-
-# Sadece isim düzeltmesi yapıyoruz (postgres -> postgresql)
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///mysite.db'
-
-# İŞTE ÇÖZÜM BURASI: Motor Ayarlarıyla SSL'i Zorluyoruz
-# Bu kod, adres ne olursa olsun arka planda SSL sertifikasını şart koşar.
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "connect_args": {
-        "sslmode": "require"
-    }
-}
-
 app.config['UPLOAD_FOLDER'] = '/tmp' 
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024
 
@@ -139,7 +128,7 @@ def get_date_from_file(file_path, filename):
     timestamp = os.path.getmtime(file_path)
     return datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
 
-# --- ROTALAR ---
+# --- GİRİŞ / ÇIKIŞ ROTALARI ---
 
 @app.route('/login', methods=['GET', 'POST'])
 def login_page():
@@ -158,6 +147,7 @@ def logout():
     session.clear()
     return redirect(url_for('login_page'))
 
+# --- API ROTASI (Giriş Korumalı) ---
 @app.route('/api/home_data')
 @login_required
 def api_home_data():
@@ -222,6 +212,8 @@ def api_get_pins():
             'place_name': pin.place_name
         })
     return jsonify(pin_data)
+
+# --- WEB SİTESİ ROTALARI (Giriş Korumalı) ---
 
 @app.route('/', methods=['GET', 'POST'])
 @login_required
@@ -358,6 +350,8 @@ def add_to_album():
             db.session.commit()
     return redirect(request.referrer)
 
+# --- YENİ EKLENEN ALBÜM YÖNETİM İŞLEMLERİ ---
+
 @app.route('/delete_album/<int:id>', methods=['POST'])
 @login_required
 def delete_album(id):
@@ -394,6 +388,8 @@ def update_album_cover(id):
             pass
     return redirect(url_for('view_album', id=id))
 
+# --- DİĞER FONKSİYONLAR ---
+
 @app.route('/upload_manual', methods=['POST'])
 @login_required
 def upload_manual():
@@ -424,8 +420,10 @@ def bulk_upload():
             temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(temp_path)
             
+            # Tarihi bul
             detected_date = get_date_from_file(temp_path, filename)
             
+            # Buluta yükle
             upload_result = cloudinary.uploader.upload(temp_path, resource_type="auto")
             cloud_url = upload_result['secure_url']
             
@@ -515,3 +513,4 @@ def map_page():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
