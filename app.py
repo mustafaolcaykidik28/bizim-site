@@ -24,23 +24,23 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=365)
 USER_LOGIN = "Sudis"
 USER_PASS = "280126"
 
-# --- 🐘 VERİTABANI BAĞLANTISI (DÜZELTİLDİ) ---
+# --- 🐘 VERİTABANI BAĞLANTISI (PROFESYONEL AYAR) ---
 database_url = os.environ.get('DATABASE_URL')
 
-# 1. postgres:// -> postgresql:// düzeltmesi
+# Sadece isim düzeltmesi yapıyoruz (postgres -> postgresql)
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-# 2. SSL Modunu Zorla (BU KISIM HATAYI ÇÖZECEK)
-if database_url:
-    if "sslmode" not in database_url:
-        # Eğer adresin sonunda ? varsa & ile ekle, yoksa ? ile ekle
-        if "?" in database_url:
-            database_url += "&sslmode=require"
-        else:
-            database_url += "?sslmode=require"
-
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///mysite.db'
+
+# İŞTE ÇÖZÜM BURASI: Motor Ayarlarıyla SSL'i Zorluyoruz
+# Bu kod, adres ne olursa olsun arka planda SSL sertifikasını şart koşar.
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "connect_args": {
+        "sslmode": "require"
+    }
+}
+
 app.config['UPLOAD_FOLDER'] = '/tmp' 
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024
 
